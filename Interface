@@ -1,0 +1,147 @@
+#Importing Libraries
+
+!pip install gradio
+pip install nilearn
+import pickle
+import math
+import nibabel as nib
+from nilearn.masking import compute_epi_mask
+from nilearn.masking import apply_mask
+import numpy as np
+import pandas as pd
+import os
+from PIL import Image
+import matplotlib.pyplot as plt
+%matplotlib inline
+
+#FMRI Preprocessing Function
+
+def fMRI_preprocessing(fMRI):
+  nifti_img = nib.load(fMRI)
+  mask_img = compute_epi_mask(nifti_img)
+  mask_data = mask_img.get_data().astype(bool)
+  masked_data = apply_mask(nifti_img, mask_img)
+  size=math.floor((67000-masked_data.shape[1])/2)
+  if(masked_data.shape[1]%2==0):
+    return(np.lib.pad(masked_data, ((0,0),(size,size)), 'constant', constant_values=(0,0)).reshape(-1))
+  else:
+    return(np.lib.pad(masked_data, ((0,0),(size+1,size)), 'constant', constant_values=(0,0)).reshape(-1))
+def fMRI_check_up(fMRI):
+  data=fMRI_preprocessing(fMRI) #goes to preprocessing fun
+  loaded_model = pickle.load(open('/content/drive/MyDrive/FMRI_Model.sav', 'rb'))
+  data = np.array(data)
+  data=data.reshape((1,11792000))
+  result = loaded_model.predict(data)
+
+  if(result>=0.5):
+    return 1
+  else:
+    return 0
+
+#EEG Keyboard function
+
+def EEG_keyboard_checkup(EEG):
+  data=pd.read_csv(EEG,index_col=False)
+  loaded_model = pickle.load(open('/content/drive/MyDrive/Major_Project/EEG_Keyboard_Model.sav', 'rb'))
+  bc = []
+  for i in data.values:
+    input_data_as_numpy_array = np.asarray(i)
+    input_data_reshaped = input_data_as_numpy_array.reshape(1,-1)
+
+    prediction = loaded_model.predict(input_data_reshaped)
+
+    bc.append(int(prediction))
+  bd = np.mean(bc)
+  if bd >0.5:
+    return 1
+  else:
+    return 0
+
+#EEG Emotiv function
+
+def EEG_emotiv_checkup(EEG):
+  data=pd.read_csv(EEG,index_col=False)
+  loaded_model = pickle.load(open('/content/drive/MyDrive/Major_Project/EEG_EMOTIV_Model.sav', 'rb'))
+  bc = []
+  for i in data.values:
+    input_data_as_numpy_array = np.asarray(i)
+    input_data_reshaped = input_data_as_numpy_array.reshape(1,-1)
+
+    prediction = loaded_model.predict(input_data_reshaped)
+
+    bc.append(int(prediction))
+  bd = np.mean(bc)
+  if bd >0.5:
+    return 1
+  else:
+    return 0
+
+#Integrated function
+
+def ADHD_checkup(fMRI_path,EEG_keyboard_path,EEG_emotive_path):
+  r1= fMRI_check_up(fMRI_path)
+  img = nib.load(fMRI_path)
+  img_data = img.get_fdata()
+  fig, ax = plt.subplots(ncols=3, figsize=(15, 5))
+
+  ax[0].imshow(img_data[26, :, :,0].T, origin='lower', cmap='gray')
+  ax[0].set_xlabel('Second dim voxel coords.', fontsize=12)
+  ax[0].set_ylabel('Third dim voxel coords', fontsize=12)
+  ax[0].set_title('sagittal ', fontsize=15)
+
+  ax[1].imshow(img_data[:, 32, :,0].T, origin='lower', cmap='gray')
+  ax[1].set_xlabel('First dim voxel coords.', fontsize=12)
+  ax[1].set_ylabel('Third dim voxel coords', fontsize=12)
+  ax[1].set_title('coronal', fontsize=15)
+
+  ax[2].imshow(img_data[:, :, 23,0].T, origin='lower', cmap='gray')
+  ax[2].set_xlabel('First dim voxel coords.', fontsize=12)
+  ax[2].set_ylabel('Second dim voxel coords', fontsize=12)
+  ax[2].set_title('axial', fontsize=15)
+
+  fig.tight_layout()
+  fig.savefig('output_figure.jpg')
+  output_img = Image.open("output_figure.jpg")
+
+  res1 = ""
+  res2 = ""
+  res3 = ""
+  if(r1==1):
+    res1 = "fMRI result: The person is having ADHD"
+  else:
+    res1 = "fMRI result: The Person is not having ADHD"
+  r2= EEG_keyboard_checkup(EEG_keyboard_path)
+  if(r2==1):
+    res2 = "EEG_keyboard result: The person is having ADHD"
+  else:
+    res2 = "EEG_keyboard result: The Person is not having ADHD"
+  r3 = EEG_emotiv_checkup(EEG_emotive_path)
+  if(r3==1):
+    res3 = "EEG_Emotiv result: The person is having ADHD"
+  else:
+    res3 = "EEG_Emotiv result: The Person is not having ADHD"
+  if((r1==1 and r2==1) or (r2==1 and r3==1) or (r1==1 and r3==1)):
+    res4 = "Overall Result: The person is having ADHD"
+    result = res1 + "\n" + res2 + "\n" + res3 + "\n" + res4
+    sample_image = Image.open("adhd.jpg")
+    return result, output_img, sample_image
+
+  else:
+    res4 = "Overall Result: The person is not having ADHD"
+    result = res1 + "\n" + res2 + "\n" + res3 + "\n" + res4
+    sample_image = Image.open("noadhd.jpg")
+    return result, output_img, sample_image
+
+#Interface
+
+import gradio as gr
+
+output_text = gr.Textbox(label="Output")
+output_img = gr.Image(label="fMRI Scan")
+output_image = gr.Image(label="Output Image")
+fMRI_path = gr.Textbox(label="Enter fMRI path ")
+EEG_keyboard_path = gr.Textbox(label="Enter EEG_keyboard_path ")
+EEG_emotive_path = gr.Textbox(label="Enter EEG_emotive_path")
+
+app = gr.Interface(fn=ADHD_checkup, inputs=["text","text","text"], outputs=[output_text, output_img, output_image],title="ADHD classification using fMRI and EEG")
+app.launch(share=True)
