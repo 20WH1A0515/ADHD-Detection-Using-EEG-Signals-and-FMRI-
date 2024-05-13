@@ -1,0 +1,178 @@
+#Importing Libraries
+pip install nilearn
+import numpy as np
+import os
+import nibabel as nib
+from nilearn.masking import compute_epi_mask
+from nilearn.masking import apply_mask
+from nilearn.input_data import NiftiMasker
+import matplotlib.pyplot as plt
+%matplotlib inline
+
+#Mounting Drive
+
+from google.colab import drive
+drive.mount('/content/drive')
+
+#Extracting FMRI Files (.nii files)
+
+file='/content/drive/MyDrive/Major_Project/FMRI_Dataset'
+ADHD = os.listdir(file + '/ADHD')
+NON_ADHD = os.listdir(file + '/NON ADHD')
+from PIL import Image
+import math
+image_dataset=[]
+label=[]
+
+
+#Preprocessing ADHD Files (4D array to 2D array)
+
+for i, image_name in enumerate(ADHD):
+    print("-->> Processing",image_name)
+    nifti_img = nib.load(file + '/ADHD/' + image_name)
+    mask_img = compute_epi_mask(nifti_img)
+    masked_data = apply_mask(nifti_img, mask_img)
+    image_dataset.append(masked_data)
+    print(masked_data.shape)
+    label.append(1)
+    if(i==10):
+      break
+
+
+#Preprocessing NON-ADHD Files
+
+for i, image_name in enumerate(NON_ADHD):
+    print("-->> Processing",image_name)
+    nifti_img = nib.load(file + '/NON ADHD/' + image_name)
+    mask_img = compute_epi_mask(nifti_img)
+    masked_data = apply_mask(nifti_img, mask_img)
+    if(masked_data.shape[0]==176):
+      image_dataset.append(masked_data)
+      print(masked_data.shape)
+      label.append(0)
+    if(i==10):
+      break
+
+#Padding
+
+max_length = max([d.shape[1] for d in image_dataset])
+padded_data = []
+for d in image_dataset:
+    pad_length = max_length - d.shape[1]
+    padded_d = np.pad(d, ((0, 0), (0, pad_length)), mode='constant')
+    padded_data.append(padded_d)
+image_dataset = np.array(padded_data)
+label = np.array(label)
+
+#Train Test Split
+
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test = train_test_split(image_dataset, label, test_size = 0.20, random_state = 42,stratify=label)
+
+#Data Visualization
+# Load fMRI data
+fmri_file = '/content/drive/MyDrive/FMRI_Dataset/ADHD/fmri_X_2054438_session_1_run1.nii'
+img = nib.load(fmri_file)
+img_data = img.get_fdata()
+print(type(img_data))  # it's a numpy array!
+print(img_data.shape)
+print(img_data)
+mid_slice_x_fmri = img_data[39, :, :,0]  # x = 39, t = 0
+
+print("Shape of slice: %s" % (mid_slice_x_fmri.shape,))
+
+plt.imshow(mid_slice_x_fmri.T, cmap='gray', origin='lower')
+plt.xlabel('First axis')
+plt.ylabel('Second axis')
+plt.colorbar(label='Signal intensity')
+plt.show()
+
+fig, ax = plt.subplots(ncols=3, figsize=(15, 5))
+
+ax[0].imshow(img_data[26, :, :,0].T, origin='lower', cmap='gray')
+ax[0].set_xlabel('Second dim voxel coords.', fontsize=12)
+ax[0].set_ylabel('Third dim voxel coords', fontsize=12)
+ax[0].set_title('sagittal ', fontsize=15)
+
+ax[1].imshow(img_data[:, 32, :,0].T, origin='lower', cmap='gray')
+ax[1].set_xlabel('First dim voxel coords.', fontsize=12)
+ax[1].set_ylabel('Third dim voxel coords', fontsize=12)
+ax[1].set_title('coronal', fontsize=15)
+
+ax[2].imshow(img_data[:, :, 23,0].T, origin='lower', cmap='gray')
+ax[2].set_xlabel('First dim voxel coords.', fontsize=12)
+ax[2].set_ylabel('Second dim voxel coords', fontsize=12)
+ax[2].set_title('axial', fontsize=15)
+
+fig.tight_layout()
+ 
+#Visualization of Masked Data
+
+from nilearn.masking import compute_epi_mask
+mask_img = compute_epi_mask(fmri_file)
+mask_data = mask_img.get_data().astype(bool)
+fig, ax = plt.subplots(ncols=3, figsize=(15, 5))
+
+ax[0].imshow(np.rot90(mask_data[26, :, :]), interpolation='nearest')
+fig.subplots_adjust(left=.02, bottom=.02, right=.98, top=.95)
+ax[0].set_xlabel('Second dim voxel coords.', fontsize=12)
+ax[0].set_ylabel('Third dim voxel coords', fontsize=12)
+ax[0].set_title('sagittal ', fontsize=15)
+
+ax[1].imshow(np.rot90(mask_data[:, 32, :]), interpolation='nearest')
+fig.subplots_adjust(left=.02, bottom=.02, right=.98, top=.95)
+ax[1].set_xlabel('First dim voxel coords.', fontsize=12)
+ax[1].set_ylabel('Third dim voxel coords', fontsize=12)
+ax[1].set_title('coronal', fontsize=15)
+
+ax[2].imshow(np.rot90(mask_data[:, :, 23]), interpolation='nearest')
+fig.subplots_adjust(left=.02, bottom=.02, right=.98, top=.95)
+ax[2].set_xlabel('First dim voxel coords.', fontsize=12)
+ax[2].set_ylabel('Second dim voxel coords', fontsize=12)
+ax[2].set_title('axial', fontsize=15)
+
+fig.tight_layout()
+ 
+
+#CNN Model
+
+import tensorflow
+from tensorflow.keras import layers
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM, Dense, Masking
+import tensorflow.keras as keras
+# Define the LSTM model
+model = Sequential()
+model.add(layers.Conv2D(2, (3, 3), activation='relu', input_shape=(176, max_length ,1)))
+model.add(layers.MaxPooling2D((2, 2)))
+model.add(layers.Conv2D(2, (3, 3), activation='relu'))
+model.add(layers.Flatten())
+model.add(layers.Dense(2, activation='relu'))
+model.add(Dense(1, activation='sigmoid'))
+from tensorflow.keras.utils import plot_model
+plot_model(cnn_model, to_file='model.png', rankdir='LR')
+
+ 
+import datetime
+logdir = os.path.join("logs", datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
+tensorboard_callback = tf.keras.callbacks.TensorBoard(logdir, histogram_freq=1)
+model.compile(loss='binary_crossentropy', optimizer=keras.optimizers.Adam(), metrics=['accuracy'])
+history=cnn_model.fit(X_train_new, y_train_new, epochs=100,validation_data=(X_test_new, y_test_new) ,batch_size=100)
+
+model.summary()
+ 
+#Accuracy
+
+score = model.evaluate(X_train, y_train)
+print('Training accuracy: {}%'.format(score[1]*100))
+ 
+score = model.evaluate(X_test, y_test)
+print('Test accuracy: {}%'.format(score[1]*100))
+ 
+
+#Saving Model
+
+import pickle
+
+filename = '/content/drive/MyDrive/Major_Project/FMRI_Model.sav'
+pickle.dump(model, open(filename, 'wb'))
