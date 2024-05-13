@@ -1,0 +1,188 @@
+from google.colab import drive
+drive.mount('/content/drive', force_remount=True)
+import pandas as pd
+import numpy as np
+import glob
+
+#Loading ADHD KEYBOARD dataset
+
+# File path pattern to match all CSV files in a directory
+file_pattern = '/content/drive/MyDrive/FOCUS-Dataset/ADHD/7/Keyboard/ayse nur key*.csv'
+
+# Read all CSV files into a list of DataFrames
+all_files = glob.glob(file_pattern)
+list_of_dfs = [pd.read_csv(file,index_col=False) for file in all_files]
+# File path pattern to match all CSV files in a directory
+file_pattern = '/content/drive/MyDrive/FOCUS-Dataset/ADHD/10/Keyboard/key zeynep*.csv'
+
+all_files = glob.glob(file_pattern)
+list_of_df1 = [pd.read_csv(file,index_col=False) for file in all_files]
+for i in list_of_df1:
+  list_of_dfs.append(i)
+file_pattern = '/content/drive/MyDrive/FOCUS-Dataset/ADHD/8/Keyboard/Humam Key*.csv'
+all_files = glob.glob(file_pattern)
+list_of_df1 = [pd.read_csv(file,index_col=False) for file in all_files]
+for i in list_of_df1:
+  list_of_dfs.append(i)
+
+file_pattern = '/content/drive/MyDrive/FOCUS-Dataset/ADHD/9/Keyboard/key said*.csv'
+all_files = glob.glob(file_pattern)
+list_of_df1 = [pd.read_csv(file,index_col=False) for file in all_files]
+for i in list_of_df1:
+  list_of_dfs.append(i)
+
+
+#Concatenate all CSV files of ADHD 
+
+df_adhd = pd.concat(list_of_dfs, ignore_index=True)
+df_adhd.head(5)
+for i in df_adhd['Theta']:
+  df_adhd['ADHD'] = 1
+
+#Loading NON ADHD KEYBOARD dataset
+# File path pattern to match all CSV files in a directory
+file_pattern =
+'/content/drive/MyDrive/FOCUS-Dataset/Non-
+ADHD/1/Keyboard/abdul_keyboard*.csv'
+
+# Read all CSV files into a list of DataFrames
+all_files = glob.glob(file_pattern)
+list_of_df1 = [pd.read_csv(file,index_col=False) for file in all_files]
+list_of_dfs = []
+for i in list_of_df1:
+  list_of_dfs.append(i)
+file_pattern =
+'/content/drive/MyDrive/FOCUS-Dataset/Non-ADHD/2/Keyboard/alaa_keyboard*.csv'
+all_files = glob.glob(file_pattern)
+list_of_df1 = [pd.read_csv(file,index_col=False) for file in all_files]
+for i in list_of_df1:
+  list_of_dfs.append(i)
+file_pattern = '/content/drive/MyDrive/FOCUS-Dataset/Non-ADHD/3/Keyboard/ali_keyboard*.csv'
+
+all_files = glob.glob(file_pattern)
+list_of_df1 = [pd.read_csv(file, index_col=False) for file in all_files]
+for i in list_of_df1:
+  list_of_dfs.append(i)
+file_pattern = '/content/drive/MyDrive/FOCUS-Dataset/Non-ADHD/4/Keyboard/amer_keyboard*.csv'
+all_files = glob.glob(file_pattern)
+list_of_df1 = [pd.read_csv(file, index_col=False) for file in all_files]
+for i in list_of_df1:
+  list_of_dfs.append(i)
+file_pattern = '/content/drive/MyDrive/FOCUS-Dataset/Non-ADHD/5/Keyboard/sharno_keyboard*.csv'
+all_files = glob.glob(file_pattern)
+list_of_df1 = [pd.read_csv(file, index_col=False) for file in all_files]
+for i in list_of_df1:
+  list_of_dfs.append(i)
+
+#Concatenate all CSV files of NON ADHD 
+df_nonadhd = pd.concat(list_of_dfs, ignore_index=True)
+for i in df_nonadhd['Theta']:
+  df_nonadhd['ADHD'] = 0
+df_nonadhd.head()
+
+#Concatenate all ADHD and NON ADHD KEYBOARD datasets
+
+df = pd.concat([df_adhd, df_nonadhd], ignore_index=True)
+df.isnull().sum()
+#Concatenate all ADHD and NON ADHD KEYBOARD datasets
+
+df = pd.concat([df_adhd, df_nonadhd], ignore_index=True)
+df.isnull().sum()
+df.groupby('ADHD').mean()
+print("Percentage of children having ADHD : ",(adhd/len(df))*100)
+print("Percentage of children not having ADHD : ",(nonadhd/len(df))*100)
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+correlation = df.corr()
+sns.heatmap(correlation, annot=True)
+plt.show()
+
+#Train Test split of dataset
+
+from sklearn.model_selection import train_test_split
+X = df.drop("ADHD",axis=1)
+y = df["ADHD"]
+X_train, X_test, y_train, y_test = train_test_split(X,y,test_size=0.2,random_state=42)
+
+#Logistic Regression:
+
+from sklearn.linear_model import LogisticRegression
+model = LogisticRegression()
+model.fit(X_train,y_train)
+from sklearn.metrics import accuracy_score
+pred = model.predict(X_test)
+testing_data_accuracy = accuracy_score(pred, y_test)
+print("Accuracy of testing data : ",testing_data_accuracy)
+
+ 
+#Decision Tree
+ 
+from sklearn.tree import DecisionTreeClassifier
+dtree = DecisionTreeClassifier()
+dtree.fit(X_train,y_train)
+dtree_pred = dtree.predict(X_test)
+testing_data_accuracy = accuracy_score(y_test, dtree_pred)
+print("Accuracy of testing data : ",testing_data_accuracy)
+
+#Naive Bayes
+
+from sklearn.naive_bayes import GaussianNB
+from sklearn import metrics
+naive_model = GaussianNB()
+naive_model.fit(X_train, y_train)
+naive_pred = naive_model.predict(X_test)
+print('Accuracy Score:')
+print(metrics.accuracy_score(y_test,naive_pred))
+
+ 
+#Random Forest
+
+from sklearn.ensemble import RandomForestClassifier
+random_forest = RandomForestClassifier(random_state=42)
+random_forest.fit(X_train, y_train)
+random_forest_pred = random_forest.predict(X_test)
+print('Accuracy Score:')
+print(metrics.accuracy_score(y_test,random_forest_pred))
+
+ 
+from sklearn.metrics import confusion_matrix
+cm = confusion_matrix(y_test, random_forest_pred)
+f,ax = plt.subplots(figsize=(10, 10))
+sns.heatmap(cm, annot=True, linewidths=0.5,linecolor="red", fmt= '.0f',ax=ax)
+plt.show()
+
+#Testing Random Forest Model
+
+input_data = (96.8516677,45.12782737,24.14410106,10.62486169,5.444157718)
+# change the input data to a numpy array
+input_data_as_numpy_array= np.asarray(input_data)
+# reshape the numpy array as we are predicting for only on instance
+input_data_reshaped = input_data_as_numpy_array.reshape(1,-1)
+prediction = random_forest.predict(input_data_reshaped)
+print(prediction)
+if (prediction[0]== 0):
+  print('The Person does not have ADHD')
+else:
+  print('The Person has ADHD')
+ 
+fpr, tpr, _ = metrics.roc_curve(y_test,  random_forest_pred)
+#create ROC curve
+plt.plot(fpr,tpr)
+plt.ylabel('True Positive Rate')
+plt.xlabel('False Positive Rate')
+plt.show()
+auc = metrics.roc_auc_score(y_test, random_forest_pred)
+#create AUC curve
+plt.plot(fpr,tpr,label="AUC="+str(auc))
+plt.ylabel('True Positive Rate')
+plt.xlabel('False Positive Rate')
+plt.legend(loc=4)
+plt.show()
+
+#Saving Model
+
+import pickle
+
+filename = '/content/drive/MyDrive/Major_Project/EEG_Keyboard_Model.sav'
+pickle.dump(random_forest, open(filename, 'wb'))
